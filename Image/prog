@@ -1,0 +1,33 @@
+#!/bin/bash
+
+elevFile="/home/rigvita/php/project/Elevation/gebco/gebco_08.nc"
+outps="plot.ps"
+
+EvtFile=epicenter.txt
+Lon=`cat ${EvtFile} | awk 'NR==1{printf "%d",substr($0,1,6)}'`
+Lat=`cat ${EvtFile} | awk 'NR==1{printf "%d",substr($0,8,6)}'`
+
+minLon=`echo ${Lon}-5 | bc`
+maxLon=`echo ${Lon}+5 | bc`
+minLat=`echo ${Lat}-5 | bc`
+maxLat=`echo ${Lat}+5 | bc`
+
+region=${minLon}/${maxLon}/${minLat}/${maxLat}
+
+gmt grdcut ${elevFile} -R${region} -GselRegion.nc 1>/dev/null 2>/dev/null
+gmt grdgradient selRegion.nc -GselRegion_int.nc -A15 -Nt0.55 1>/dev/null 2>/dev/null
+gmt makecpt -Cglobe -T-10000/10000/1 -Z > g.cpt
+
+gmt gmtset PS_MEDIA 21.0cx20.0c
+
+gmt psbasemap -R${region} -JQ15c -Bxa1 -Bya1 -BnSeW+t"Focal Mechanism" -P -K > ${outps}
+
+gmt grdimage selRegion.nc -R -J -Cg.cpt -IselRegion_int.nc -K -O >> ${outps}
+gmt pscoast -R -J -Df -W0.6p,0/0/0,solid -Na/0.2p,0/0/0,solid -Ia/0.2p,0/0/255,solid -K -O >> ${outps}
+#gmt pscoast -R -J -Df -W1p,0/0/0,solid -Na/0.7p,0/0/0,solid -Ia/0.7p,0/0/255,solid -G200/200/200 -S200/200/255 -K -O >> ${outps}
+
+gmt psxy epicenter.txt -R -J -Sa0.6c -W1p,0/0/0,solid -G255/255/0 -K -O >> ${outps}
+
+gmt psmeca fps.txt -R -J -Sa1.0c -C0.5p,0/0/0,-- -Fr -O >> ${outps}
+
+gmt psconvert ${outps} -Tg -E300

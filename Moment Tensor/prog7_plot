@@ -1,0 +1,70 @@
+#!/bin/bash
+
+test -d Plot || mkdir Plot
+cd Plot
+
+read eLon eLat eDep mag <<< `saclst evlo evla evdp mag f ../Inv/*Z | awk 'NR==1{print $2,$3,$4,$5}'`
+read st dp rk magN <<< `cat ../Inv/fmdfit.dat | awk '{print $3,$4,$5,$6}'`
+
+################## fms ################################
+outPS="map.ps"
+reg="-100/-75/30/48"
+proj="M17c"
+
+echo ${eLon} ${eLat} ${eDep} ${st} ${dp} ${rk} ${magN} 0 0 > fms.txt
+
+gmt pscoast -R${reg} -J${proj} -Bxa5 -Bya5 -Di -W -P -K > ${outPS}
+gmt psmeca fms.txt -R -J -Sa2.0c -O -P >> ${outPS}
+
+gmt psconvert ${outPS} -E300 -Tg
+#######################################################
+
+
+################## wf #################################
+outPS="wfit.ps"
+
+fileobs=../Inv/OLILZ.obs
+
+filebase=`basename ${fileobs} Z.obs`
+zobs=${filebase}Z.obs
+robs=${filebase}R.obs
+tobs=${filebase}T.obs
+zpre=${filebase}Z.pre
+rpre=${filebase}R.pre
+tpre=${filebase}T.pre
+
+tmin=0
+tmax=`saclst delta npts f ../Inv/${zobs} | awk '{print $2*$3}'`
+
+depmin=`saclst depmin f ../Inv/${filebase}* | sort -k2,2 -n | awk 'NR==1{print ($2<0)? -$2:$2}'`
+depmax=`saclst depmax f ../Inv/${filebase}* | sort -k2,2 -r | awk 'NR==1{print $2}'`
+ymax=`echo ${depmin} ${depmax} | awk '{print ($1>$2) ? $1:$2}'`
+ymin=-${ymax}
+
+reg=${tmin}/${tmax}/${ymin}/${ymax}
+
+b=`saclst b f ../Inv/${zobs} | awk '{print $2}'`
+sacdump ../Inv/${zobs} | awk -v b=${b} '{print $1-b,$2}' > ${filebase}Z.obs
+gmt psxy ${filebase}Z.obs -R${reg} -JX5c/2c -Bxa5+l'time (s)' -BnSew -W1p,0/0/255,solid -K -P > ${outPS}
+b=`saclst b f ../Inv/${zpre} | awk '{print $2}'`
+sacdump ../Inv/${zpre} | awk -v b=${b} '{print $1-b,$2}' > ${filebase}Z.pre
+gmt psxy ${filebase}Z.pre -R${reg} -J -W1p,255/0/0,solid -K -O -P >> ${outPS}
+
+b=`saclst b f ../Inv/${robs} | awk '{print $2}'`
+sacdump ../Inv/${robs} | awk -v b=${b} '{print $1-b,$2}' > ${filebase}R.obs
+gmt psxy ${filebase}R.obs -R${reg} -JX5c/2c -Bxa5+l'time (s)' -BnSew -W1p,0/0/255,solid -X6c -K -O -P >> ${outPS}
+b=`saclst b f ../Inv/${rpre} | awk '{print $2}'`
+sacdump ../Inv/${rpre} | awk -v b=${b} '{print $1-b,$2}' > ${filebase}R.pre
+gmt psxy ${filebase}R.pre -R${reg} -J -W1p,255/0/0,solid -K -O -P >> ${outPS}
+
+b=`saclst b f ../Inv/${tobs} | awk '{print $2}'`
+sacdump ../Inv/${robs} | awk -v b=${b} '{print $1-b,$2}' > ${filebase}T.obs
+gmt psxy ${filebase}T.obs -R${reg} -JX5c/2c -Bxa5+l'time (s)' -BnSew -W1p,0/0/255,solid -X6c -K -O -P >> ${outPS}
+b=`saclst b f ../Inv/${rpre} | awk '{print $2}'`
+sacdump ../Inv/${tpre} | awk -v b=${b} '{print $1-b,$2}' > ${filebase}T.pre
+gmt psxy ${filebase}R.pre -R${reg} -J -W1p,255/0/0,solid -O -P >> ${outPS}
+
+rm ${filebase}*
+
+gmt psconvert ${outPS} -E300 -Tg
+#######################################################

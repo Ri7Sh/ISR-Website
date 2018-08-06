@@ -1,0 +1,35 @@
+#!/bin/bash
+
+elevFile="/home/rigvita/php/project/Elevation/gebco/gebco_08.nc"
+outps="plot.ps"
+
+EvtFile=min_max_latLON.txt
+minLat1=`cat ${EvtFile} | awk 'NR==1{printf "%f",substr($0,1,6)}'`
+maxLat1=`cat ${EvtFile} | awk 'NR==1{printf "%f",substr($0,8,6)}'`
+minLon1=`cat ${EvtFile} | awk 'NR==1{printf "%f",substr($0,15,6)}'`
+maxLon1=`cat ${EvtFile} | awk 'NR==1{printf "%f",substr($0,22,6)}'`
+
+
+
+minLon=`echo ${minLon1}-5 | bc`
+maxLon=`echo ${maxLon1}+5 | bc`
+minLat=`echo ${minLat1}-5 | bc`
+maxLat=`echo ${maxLat1}+5 | bc`
+
+region=${minLon}/${maxLon}/${minLat}/${maxLat}
+
+gmt grdcut ${elevFile} -R${region} -GselRegion.nc 1>/dev/null 2>/dev/null
+gmt grdgradient selRegion.nc -GselRegion_int.nc -A15 -Nt0.55 1>/dev/null 2>/dev/null
+gmt makecpt -Cglobe -T-10000/10000/1 -Z > g.cpt
+
+gmt gmtset PS_MEDIA 20.0cx15.0c
+
+gmt psbasemap -R${region} -JQ15c -Bxa3 -Bya3 -BnSeW+t"All Epicenters" -P -K > ${outps}
+
+gmt grdimage selRegion.nc -R -J -Cg.cpt -IselRegion_int.nc -K -O >> ${outps}
+gmt pscoast -R -J -Df -W0.6p,0/0/0,solid -Na/0.2p,0/0/0,solid -Ia/0.2p,0/0/255,solid -K -O >> ${outps}
+#gmt pscoast -R -J -Df -W1p,0/0/0,solid -Na/0.7p,0/0/0,solid -Ia/0.7p,0/0/255,solid -G200/200/200 -S200/200/255 -K -O >> ${outps}
+
+gmt psxy ALLepicenter.txt -R -J -Sa0.6c -W1p,0/0/0,solid -G255/255/0 -O >> ${outps}
+
+gmt psconvert ${outps} -Tg -E300

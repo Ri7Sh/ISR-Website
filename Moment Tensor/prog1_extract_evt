@@ -1,0 +1,34 @@
+#!/bin/bash
+
+fseed="20080418093700.seed"
+oY=2008
+oM=04
+oD=18
+oh=09
+om=37
+os=00
+hlat=38.45
+hlon=-87.89
+hdep=11.6
+mag=5.2
+
+
+oJ=`date -d ${oY}-${oM}-${oD}T${oh}:${om}:${os}Z -u +%j`
+osi=`echo ${os} | awk '{print int($1)}'`
+osm=`echo ${os} | awk '{print int(($1-int($1))*1000)}'`
+
+test -d resp || mkdir resp
+test -d sac || mkdir sac
+rm -f resp/*
+rm -r sac/*
+rm -f sac/*
+
+rdseed -f ${fseed} -R -q resp 1>/dev/null 2>/dev/null
+rdseed -f ${fseed} -d -o 1 -q sac 1>/dev/null 2>/dev/null
+
+gsac 1>/dev/null 2>/dev/null << EOF
+r sac/*
+ch o gmt ${oY} ${oJ} ${oh} ${om} ${osi} ${osm}
+wh
+q
+EOF

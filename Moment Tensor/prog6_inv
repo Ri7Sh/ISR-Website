@@ -1,0 +1,84 @@
+#!/bin/bash
+
+
+cutPre=-5
+cutPost=30
+fl=0.01
+fh=0.20
+newDt=0.5
+
+###########################
+
+test -d Inv || mkdir Inv
+cd Inv
+rm -f *
+
+touch WW
+
+for sacfile in ../sac_cor/*Z.SAC
+do
+  sacbase=`basename ${sacfile} Z.SAC`
+  zfile=${sacbase}Z.SAC
+  rfile=${sacbase}R.SAC
+  tfile=${sacbase}T.SAC
+
+  test -f ../sac_cor/${zfile} && test -f ../sac_cor/${rfile} && test -f ../sac_cor/${tfile} || continue
+  Stn=`saclst kstnm f ../sac_cor/${zfile} | awk '{print $2}'`
+  Dist=`saclst dist f ../sac_cor/${zfile} | awk '{print $2}'`
+
+  dwt=`echo ${Dist} | awk '{if($1<200)print 1.00; if($1>=200 && $1<300)print 0.50; if($1>=300 && $1<500)print 0.25; if($1>=500)print 0.10}'`
+
+  #for observed data
+  sac 1>/dev/null  2>/dev/null << EOF
+  cut a ${cutPre} a ${cutPost}
+  cuterr fillz
+  r ../sac_cor/${zfile} ../sac_cor/${rfile} ../sac_cor/${tfile}
+  w ${Stn}Z ${Stn}R ${Stn}T
+  cut off
+
+  r ${Stn}Z ${Stn}R ${Stn}T
+  lp bu c ${fh} n 3 p 1
+  interpolate delta ${newDt}
+  hp bu c ${fl} n 3 p 1
+  rmean
+  rtr
+  sync
+  w over
+
+  q
+EOF
+
+  #for synthetic data
+  cp ../green/${Stn}.* .
+  sac 1>/dev/null  2>/dev/null << EOF
+  cut a ${cutPre} a ${cutPost}
+  cuterr fillz
+  r ${Stn}.???
+  w over
+  cut off
+
+  r ${Stn}.???
+  lp bu c ${fh} n 3 p 1
+  interpolate delta ${newDt}
+  hp bu c ${fl} n 3 p 1
+  rmean
+  rtr
+  sync
+  w over
+
+  q
+EOF
+
+  echo 1 \'${Stn}Z\' \'${Stn}\' ${dwt} >> WW
+  echo 2 \'${Stn}R\' \'${Stn}\' ${dwt} >> WW
+  echo 3 \'${Stn}T\' \'${Stn}\' ${dwt} >> WW
+
+  #break #sacfile
+done
+
+wvfgrd96 -N 10 << EOF
+WW
+report.txt
+EOF
+
+grep WVFGRD96 report.txt | fmmfit
